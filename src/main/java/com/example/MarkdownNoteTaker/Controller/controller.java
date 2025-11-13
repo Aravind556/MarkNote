@@ -12,7 +12,6 @@ import com.example.MarkdownNoteTaker.Service.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 @RestController
 @RequestMapping("/hi")
 public class controller {
@@ -26,7 +25,7 @@ public class controller {
 
     @GetMapping()
     public String getMethodName() {
-        return  "Hi bby !";
+        return  "Hi !";
     }
 
     @PostMapping("/file")
@@ -40,6 +39,4 @@ public class controller {
             return ResponseEntity.status(500).body("File upload failed.");
         }
     }
-    
-    
 }
