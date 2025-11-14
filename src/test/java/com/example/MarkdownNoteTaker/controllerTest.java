@@ -1,8 +1,6 @@
 // src/test/java/com/example/MarkdownNoteTaker/Controller/controllerTest.java
 package com.example.MarkdownNoteTaker;
 
-import com.example.MarkdownNoteTaker.Controller.controller;
-import com.example.MarkdownNoteTaker.Service.service;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
