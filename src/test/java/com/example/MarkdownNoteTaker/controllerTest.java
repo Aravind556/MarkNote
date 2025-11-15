@@ -17,20 +17,20 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controller.class)
+@WebMvcTest(NoteController.class)
 @org.springframework.context.annotation.Import(controllerTest.MockConfig.class)
 public class controllerTest {
 
     @Autowired
     private MockMvc mockMvc;
     @Autowired
-    private service service;
+    private NoteService service;
 
     @org.springframework.boot.test.context.TestConfiguration
     static class MockConfig {
         @org.springframework.context.annotation.Bean
-        public service service() {
-            return org.mockito.Mockito.mock(service.class);
+        public NoteService service() {
+            return org.mockito.Mockito.mock(NoteService.class);
         }
     }
 
