@@ -126,4 +126,11 @@ public class NoteService{
     public List<Note> getAllNotes(){
         return repository.findAll();
     }
+
+
+    //Grammar Service 
+
+    public String grammarCheck(String content){
+        
+    }
 }
