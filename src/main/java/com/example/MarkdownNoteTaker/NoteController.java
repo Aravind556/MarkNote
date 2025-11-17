@@ -8,10 +8,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import com.example.MarkdownNoteTaker.NoteService;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+
 
 @RestController
 @RequestMapping("/hi")
@@ -72,6 +74,20 @@ public class NoteController {
             return ResponseEntity.status(500).body(null);
         }
         
+    }
+
+    @PostMapping("/grammar")
+    public ResponseEntity<String> Grammar(@RequestParam("File") MultipartFile file){ 
+        //TODO: process POST request
+        try{
+            String mkcontent=service.filetomkd(file);
+            return ResponseEntity.ok(service.grammarCheck(mkcontent));
+        }
+        catch (Exception e){
+            logger.error("Error in grammar check", e);
+            return ResponseEntity.status(500).body("Internal server error");
+        }
+    
     }
     
 }
