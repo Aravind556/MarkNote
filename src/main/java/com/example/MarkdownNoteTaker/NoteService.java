@@ -9,7 +9,7 @@ import org.owasp.html.PolicyFactory;
 import org.owasp.html.Sanitizers;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.genai.Client;
 import com.google.genai.types.GenerateContentResponse;
 import com.vladsch.flexmark.html.HtmlRenderer;
@@ -19,12 +19,10 @@ import com.vladsch.flexmark.util.ast.Node;
 import lombok.extern.slf4j.Slf4j;
 
 
-
 @Service
 @Slf4j
 public class NoteService{
 
-    
     private final Parser parser;
     private final HtmlRenderer renderer;
     private final Repository repository;
@@ -100,7 +98,6 @@ public class NoteService{
             throw new IllegalArgumentException("Invalid file type. Only .md files are supported.");
         }
         return StringEscapeUtils.escapeHtml3(fileName);
-
         
     }
     //Saving note to database
@@ -133,11 +130,9 @@ public class NoteService{
         return repository.findAll();
     }
     
-
-
     //Grammar Service 
 
-    public String grammarCheck(String content){
+    public List<Issue> grammarCheck(String content){
         try{
 
             log.info("Starting grammar check via Gemini API");
@@ -153,7 +148,7 @@ public class NoteService{
             "- Do NOT add new content or remove content\n" +
             "- Preserve line breaks and input structure exactly as provided\n" +
             "- Only make minimal corrections required for correctness and clarity\n\n" +
-            "Your response must be returned strictly as a JSON object in the following structure:\n" +
+            "Your response must be returned in JSON in the following structure:\n" +
             "{\n" +
             "  \"correctedText\": \"string - the fully corrected markdown text\",\n" +
             "  \"issues\": [\n" +
@@ -177,7 +172,19 @@ public class NoteService{
                 prompt,
                 null
             );
-            return response.text();
+            
+            String json = response.text();
+            int start = json.indexOf("{");
+            int end=json.lastIndexOf("}")+1;
+            json=json.substring(start, end);
+
+            log.info(json);
+
+            //parsing response to dto
+            ObjectMapper objectMapper = new ObjectMapper();
+            GeminiResponse geminiResponse = objectMapper.readValue(json, GeminiResponse.class);
+            log.info(geminiResponse.correctedText());
+            return geminiResponse.issues();
             
         }
         catch(Exception e){
@@ -195,4 +202,7 @@ public class NoteService{
         String suggestion,
         String explanation
     ) {}
+
+    // Getting live suggestions using a language server
+    //TODO: IMplement Jlanguage tool for suggestions
 }
