@@ -2,13 +2,18 @@ package com.example.MarkdownNoteTaker;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.text.StringEscapeUtils;
+import org.languagetool.JLanguageTool;
+import org.languagetool.language.AmericanEnglish;
+import org.languagetool.rules.RuleMatch;
 import org.owasp.html.PolicyFactory;
 import org.owasp.html.Sanitizers;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.genai.Client;
 import com.google.genai.types.GenerateContentResponse;
@@ -136,34 +141,42 @@ public class NoteService{
         try{
 
             log.info("Starting grammar check via Gemini API");
-            String prompt= "You are a professional grammar correction assistant.\n\n" +
-            "You will receive text written in Markdown format. Your task is to correct ONLY the following:\n" +
-            "- Grammar errors\n" +
-            "- Spelling mistakes\n" +
-            "- Punctuation errors\n" +
-            "- Sentence clarity and readability (without changing tone or meaning)\n\n" +
-            "Important rules:\n" +
-            "- Do NOT change or remove any Markdown formatting (headings, bold, italics, lists, bullet points, code blocks, links, tables, quotes, etc.)\n" +
-            "- Do NOT rewrite sentences unnecessarily or modify meaning\n" +
-            "- Do NOT add new content or remove content\n" +
-            "- Preserve line breaks and input structure exactly as provided\n" +
-            "- Only make minimal corrections required for correctness and clarity\n\n" +
-            "Your response must be returned in JSON in the following structure:\n" +
-            "{\n" +
-            "  \"correctedText\": \"string - the fully corrected markdown text\",\n" +
-            "  \"issues\": [\n" +
-            "    {\n" +
-            "      \"line\": number,\n" +
-            "      \"original\": \"string - the original incorrect portion\",\n" +
-            "      \"suggestion\": \"string - corrected text\",\n" +
-            "      \"explanation\": \"string - brief reason\"\n" +
-            "    }\n" +
-            "  ]\n" +
-            "}\n\n" +
-            "Below is the Markdown text that needs correction. Apply the instructions above:\n" +
-            "<<<START_OF_MARKDOWN>>>\n" +
-            content + "\n" +
-            "<<<END_OF_MARKDOWN>>>";
+            String prompt =
+        "You are a professional grammar correction assistant.\n\n" +
+        "You will receive text written in Markdown format. Your task is to correct ONLY the following:\n" +
+        "- Grammar errors\n" +
+        "- Spelling mistakes\n" +
+        "- Punctuation errors\n" +
+        "- Sentence clarity and readability (without changing tone or meaning)\n\n" +
+        "Important rules:\n" +
+        "- Do NOT change or remove any Markdown formatting (headings, bold, italics, lists, bullet points, code blocks, links, tables, quotes, etc.)\n" +
+        "- Do NOT rewrite sentences unnecessarily or modify meaning\n" +
+        "- Do NOT add new content or remove content\n" +
+        "- Preserve line breaks and input structure exactly as provided\n" +
+        "- Only make minimal corrections required for correctness and clarity\n\n" +
+        "Your response must be returned in JSON in the following structure:\n" +
+        "{\n" +
+        "  \"correctedText\": \"string - the fully corrected markdown text\",\n" +
+        "  \"issues\": [\n" +
+        "    {\n" +
+        "      \"line\": number,\n" +
+        "      \"offset\": number,\n" +
+        "      \"length\": number,\n" +
+        "      \"original\": \"string - the original incorrect portion\",\n" +
+        "      \"suggestion\": \"string - corrected text\",\n" +
+        "      \"explanation\": \"string - brief reason\"\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}\n\n" +
+        "STRICT OUTPUT RULES:\n" +
+        "- Output ONLY the JSON object\n" +
+        "- Do NOT include any additional text before or after the JSON\n" +
+        "- Do NOT include comments, markdown blocks, backticks, or explanations outside the JSON\n\n" +
+        "Below is the Markdown text that needs correction. Apply the instructions above:\n" +
+        "<<<START_OF_MARKDOWN>>>\n" +
+        content + "\n" +
+        "<<<END_OF_MARKDOWN>>>";
+
 
             log.info("Prompt constructed for Gemini API");
 
@@ -198,11 +211,48 @@ public class NoteService{
     public record GeminiResponse(String correctedText, List<Issue> issues) {}
     public record Issue(
         int line,
+        int offset,
+        int length,
         String original,
         String suggestion,
         String explanation
     ) {}
 
+    //Method for getting the line number as it is deprecated in the Language tools latest version
+    private int getLine(String content,int offset){
+        return (int) content.substring(0,offset).chars().filter(ch -> ch=='\n').count();
+    }
+
     // Getting live suggestions using a language server
     //TODO: IMplement Jlanguage tool for suggestions
+    public List<Issue> getLiveSuggestions(String content){  
+        JLanguageTool tool = new JLanguageTool(new AmericanEnglish());
+        try{
+             List<RuleMatch> matches = tool.check(content);
+             List<Issue> issues =new ArrayList<>();
+            for(RuleMatch match: matches){
+                log.info("Potential issue at line {}, column {}: {}", 
+                //getline and get Column are deprecated so now testing using frompos and gettopos
+                    getLine(content, match.getFromPos()), 
+                    match.getFromPos(), 
+                    match.getMessage()
+                );
+                issues.add( new Issue(
+                    getLine(content, match.getFromPos()), // Using fromPos as line
+                    match.getToPos(),   // Using toPos as offset
+                    (match.getToPos()-match.getFromPos()),
+                    content.substring(match.getFromPos(), match.getToPos()),
+                    String.join(", ", match.getSuggestedReplacements()),
+                    match.getMessage()
+                ));
+            }
+            return issues;
+
+        }
+        catch(Exception e){
+            log.error("Error in live grammar suggestions", e);
+            return null;
+        
+        }
+    }
 }

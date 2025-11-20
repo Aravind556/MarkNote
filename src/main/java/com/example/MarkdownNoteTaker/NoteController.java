@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.example.MarkdownNoteTaker.NoteService.Issue;
+import org.springframework.web.bind.annotation.RequestBody;
+
 
 
 @RestController
@@ -90,6 +92,23 @@ public class NoteController {
         }
     
     }
+
+    // suggestions from language tool
+    @PostMapping("/live")
+    public ResponseEntity<List<Issue>> LiveSuggestion(@RequestBody String content) {
+        //TODO: process POST request
+        try{
+            return ResponseEntity.ok(service.getLiveSuggestions(content));
+        }
+        catch (Exception e){
+            logger.error("Error in live suggestions", e);
+            return ResponseEntity.status(500).body(null);
+        }
+        
+        
+        
+    }
+    
     
 }
     
