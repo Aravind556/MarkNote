@@ -148,13 +148,26 @@ export default function MarkdownEditor({
           }}
         />
 
-        {/* Preview Panel */}
-        <div className="w-1/2 h-full overflow-y-auto p-8 bg-notion-sidebar-light dark:bg-notion-sidebar-dark">
-          <div className="prose prose-slate dark:prose-invert max-w-none">
-            <pre className="whitespace-pre-wrap font-sans text-notion-text-light dark:text-notion-text-dark">
-              {content || <span className="text-gray-400">Preview will appear here...</span>}
-            </pre>
+        {/* Preview Panel - Mirror of Editor */}
+        <div className="w-1/2 flex flex-col">
+          <div className="flex-1 overflow-y-auto p-8">
+            <textarea
+              value={content}
+              readOnly
+              placeholder=""
+              className="w-full h-full resize-none outline-none bg-transparent text-notion-text-light dark:text-notion-text-dark font-mono text-base leading-relaxed pointer-events-none"
+              style={{ fontFamily: 'JetBrains Mono, monospace' }}
+            />
           </div>
+
+          {/* Grammar Issues Indicator - Mirror */}
+          {grammarIssues.length > 0 && (
+            <div className="border-t border-notion-border-light dark:border-notion-border-dark p-2 bg-notion-sidebar-light dark:bg-notion-sidebar-dark flex-shrink-0">
+              <div className="text-xs text-gray-400">
+                {grammarIssues.length} issue{grammarIssues.length !== 1 ? 's' : ''} found
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
