@@ -5,7 +5,6 @@ import { noteApi } from '../../services/api'
 import toast from 'react-hot-toast'
 import EditorToolbar from './EditorToolbar'
 import GrammarSuggestion from './GrammarSuggestion'
-import ResizableSplit from '../ui/ResizableSplit'
 import type { GrammarIssue } from '../../types'
 
 interface MarkdownEditorProps {
@@ -90,17 +89,10 @@ export default function MarkdownEditor({
         isChecking={isChecking}
       />
 
-      <ResizableSplit
-        defaultLeftWidth={50}
-        defaultRightWidth={50}
-        minLeftWidth={30}
-        minRightWidth={20}
-        className="flex-1"
-        storageKey="editor-split-width"
-      >
+      <div className="flex-1 flex overflow-hidden">
         {/* Editor Area */}
-        <div className="flex flex-col h-full" style={{ position: 'relative', zIndex: 0 }}>
-          <div className="flex-1 overflow-y-auto p-8" style={{ position: 'relative' }}>
+        <div className="flex-1 flex flex-col">
+          <div className="flex-1 overflow-y-auto p-8">
             <textarea
               value={content}
               onChange={(e) => onChange(e.target.value)}
@@ -120,15 +112,51 @@ export default function MarkdownEditor({
           )}
         </div>
 
+        {/* Resize Handle */}
+        <div
+          className="w-1 cursor-col-resize hover:bg-notion-accent bg-notion-border-light dark:bg-notion-border-dark flex-shrink-0"
+          onMouseDown={(e) => {
+            e.preventDefault()
+            const startX = e.clientX
+            const startLeftWidth = 50
+            const container = e.currentTarget.parentElement
+            if (!container) return
+
+            const handleMove = (moveEvent: MouseEvent) => {
+              const containerWidth = container.offsetWidth
+              const diff = moveEvent.clientX - startX
+              const newLeftWidth = Math.max(30, Math.min(80, startLeftWidth + (diff / containerWidth) * 100))
+              const leftPanel = container.children[0] as HTMLElement
+              const rightPanel = container.children[2] as HTMLElement
+              if (leftPanel && rightPanel) {
+                leftPanel.style.width = `${newLeftWidth}%`
+                rightPanel.style.width = `${100 - newLeftWidth}%`
+              }
+            }
+
+            const handleUp = () => {
+              document.removeEventListener('mousemove', handleMove)
+              document.removeEventListener('mouseup', handleUp)
+              document.body.style.cursor = ''
+              document.body.style.userSelect = ''
+            }
+
+            document.addEventListener('mousemove', handleMove)
+            document.addEventListener('mouseup', handleUp)
+            document.body.style.cursor = 'col-resize'
+            document.body.style.userSelect = 'none'
+          }}
+        />
+
         {/* Preview Panel */}
-        <div className="h-full overflow-y-auto p-8 bg-notion-sidebar-light dark:bg-notion-sidebar-dark">
+        <div className="w-1/2 h-full overflow-y-auto p-8 bg-notion-sidebar-light dark:bg-notion-sidebar-dark">
           <div className="prose prose-slate dark:prose-invert max-w-none">
             <pre className="whitespace-pre-wrap font-sans text-notion-text-light dark:text-notion-text-dark">
               {content || <span className="text-gray-400">Preview will appear here...</span>}
             </pre>
           </div>
         </div>
-      </ResizableSplit>
+      </div>
 
       {/* AI Correction Panel */}
       {showAIPanel && aiCorrectionMutation.data && (
