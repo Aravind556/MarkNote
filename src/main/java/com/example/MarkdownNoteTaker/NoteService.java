@@ -239,7 +239,7 @@ public class NoteService{
                 );
                 issues.add( new Issue(
                     getLine(content, match.getFromPos()), // Using fromPos as line
-                    match.getToPos(),   // Using toPos as offset
+                    match.getFromPos(),   // Using fromPos as offset
                     (match.getToPos()-match.getFromPos()),
                     content.substring(match.getFromPos(), match.getToPos()),
                     String.join(", ", match.getSuggestedReplacements()),

@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useDebounce } from '../../hooks/useDebounce'
 import { useMutation } from '@tanstack/react-query'
 import { noteApi } from '../../services/api'
 import toast from 'react-hot-toast'
+import { motion, AnimatePresence } from 'framer-motion'
 import EditorToolbar from './EditorToolbar'
 import GrammarSuggestion from './GrammarSuggestion'
 import type { GrammarIssue } from '../../types'
@@ -16,11 +17,13 @@ interface MarkdownEditorProps {
 export default function MarkdownEditor({
   content,
   onChange,
-  noteId,
 }: MarkdownEditorProps) {
   const [grammarIssues, setGrammarIssues] = useState<GrammarIssue[]>([])
   const [showAIPanel, setShowAIPanel] = useState(false)
   const [isChecking, setIsChecking] = useState(false)
+  const [activeIssue, setActiveIssue] = useState<GrammarIssue | null>(null)
+  const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const debouncedContent = useDebounce(content, 1500)
 
   // Live grammar check
@@ -29,6 +32,12 @@ export default function MarkdownEditor({
     onSuccess: (issues) => {
       setGrammarIssues(issues)
       setIsChecking(false)
+      if (issues.length > 0) {
+        showPopupForIssue(issues[0])
+      } else {
+        setActiveIssue(null)
+        setPopupPosition(null)
+      }
     },
     onError: () => {
       setIsChecking(false)
@@ -56,29 +65,66 @@ export default function MarkdownEditor({
     } else {
       setGrammarIssues([])
       setIsChecking(false)
+      setActiveIssue(null)
+      setPopupPosition(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedContent])
+
+  const showPopupForIssue = (issue: GrammarIssue) => {
+    if (!textareaRef.current) return
+    const textarea = textareaRef.current
+    const lineHeight = 24
+    const charWidth = 9.6
+    const line = issue.line ?? 0
+    const col = issue.offset ?? 0
+    const top = 16 + line * lineHeight - textarea.scrollTop + 24
+    const left = 16 + col * charWidth
+    setActiveIssue(issue)
+    setPopupPosition({ top, left: Math.min(left, textarea.offsetWidth - 220) })
+  }
 
   const handleAICorrect = () => {
     if (!content.trim()) {
       toast.error('Please add some content first')
       return
     }
-    // Show info that AI correction requires backend endpoint
     toast.error('AI correction endpoint not available. Please add POST /hi/ai-correct to backend.')
-    // Uncomment below when backend endpoint is added:
-    // aiCorrectionMutation.mutate(content)
   }
 
   const handleAcceptSuggestion = (issue: GrammarIssue) => {
-    // Replace the original text with suggestion
-    const lines = content.split('\n')
-    if (lines[issue.line]) {
-      lines[issue.line] = lines[issue.line].replace(issue.original, issue.suggestion)
-      onChange(lines.join('\n'))
-      setGrammarIssues((prev) => prev.filter((i) => i !== issue))
+    const firstSuggestion = issue.suggestion.split(',')[0].trim()
+    const start = issue.offset ?? 0
+    const end = start + (issue.length ?? issue.original.length)
+    const newContent = content.slice(0, start) + firstSuggestion + content.slice(end)
+    onChange(newContent)
+    const remaining = grammarIssues.filter((i) => i !== issue)
+    setGrammarIssues(remaining)
+    if (remaining.length > 0) {
+      showPopupForIssue(remaining[0])
+    } else {
+      setActiveIssue(null)
+      setPopupPosition(null)
     }
+  }
+
+  const handleDismissIssue = () => {
+    if (!activeIssue) return
+    const remaining = grammarIssues.filter((i) => i !== activeIssue)
+    setGrammarIssues(remaining)
+    if (remaining.length > 0) {
+      showPopupForIssue(remaining[0])
+    } else {
+      setActiveIssue(null)
+      setPopupPosition(null)
+    }
+  }
+
+  const handleNextIssue = () => {
+    if (!activeIssue || grammarIssues.length === 0) return
+    const currentIndex = grammarIssues.indexOf(activeIssue)
+    const nextIndex = (currentIndex + 1) % grammarIssues.length
+    showPopupForIssue(grammarIssues[nextIndex])
   }
 
   return (
@@ -91,79 +137,84 @@ export default function MarkdownEditor({
 
       <div className="flex-1 flex overflow-hidden">
         {/* Editor Area */}
-        <div className="flex-1 flex flex-col">
-          <div className="flex-1 overflow-y-auto p-8">
+        <div className="w-1/2 flex flex-col relative">
+          <textarea
+            ref={textareaRef}
+            className="w-full h-full text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-900 text-base p-4 resize-none outline-none border-none font-mono"
+            value={content}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="Start typing your markdown here..."
+            spellCheck={false}
+            style={{ fontFamily: 'JetBrains Mono, monospace', lineHeight: '24px' }}
+          />
+
+          {/* Smooth popup for active issue */}
+          <AnimatePresence>
+            {activeIssue && popupPosition && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                transition={{ duration: 0.15, ease: 'easeOut' }}
+                className="absolute z-50 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3 min-w-[200px] max-w-[300px]"
+                style={{ top: popupPosition.top, left: popupPosition.left }}
+              >
+                <div className="absolute -bottom-2 left-4 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-white dark:border-t-gray-800" />
+                <div className="text-xs text-gray-400 mb-1">
+                  Issue {grammarIssues.indexOf(activeIssue) + 1} of {grammarIssues.length}
+                </div>
+                <div className="text-sm text-red-500 line-through mb-1">
+                  {activeIssue.original}
+                </div>
+                <div className="text-sm font-semibold text-green-600 dark:text-green-400 mb-2">
+                  → {activeIssue.suggestion.split(',')[0].trim()}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  {activeIssue.explanation}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleAcceptSuggestion(activeIssue)}
+                    className="flex-1 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium rounded transition-colors"
+                  >
+                    Accept
+                  </button>
+                  {grammarIssues.length > 1 && (
+                    <button
+                      onClick={handleNextIssue}
+                      className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs font-medium rounded transition-colors"
+                    >
+                      Next
+                    </button>
+                  )}
+                  <button
+                    onClick={handleDismissIssue}
+                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 text-xs font-medium rounded transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Preview Panel */}
+        <div className="w-1/2 flex flex-col border-l border-gray-200 dark:border-gray-700">
+          <div className="flex-1 overflow-y-auto p-4">
             <textarea
               value={content}
-              onChange={(e) => onChange(e.target.value)}
-              placeholder="Start writing your markdown note..."
-              className="w-full h-full resize-none outline-none bg-transparent text-notion-text-light dark:text-notion-text-dark font-mono text-base leading-relaxed"
+              readOnly
+              placeholder=""
+              className="w-full h-full resize-none outline-none bg-transparent text-gray-900 dark:text-gray-100 font-mono text-base leading-relaxed pointer-events-none"
               style={{ fontFamily: 'JetBrains Mono, monospace' }}
             />
           </div>
 
           {/* Grammar Issues Indicator */}
           {grammarIssues.length > 0 && (
-            <div className="border-t border-notion-border-light dark:border-notion-border-dark p-2 bg-notion-sidebar-light dark:bg-notion-sidebar-dark flex-shrink-0">
-              <div className="text-xs text-gray-400">
-                {grammarIssues.length} issue{grammarIssues.length !== 1 ? 's' : ''} found
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Resize Handle */}
-        <div
-          className="w-1 cursor-col-resize hover:bg-notion-accent bg-notion-border-light dark:bg-notion-border-dark flex-shrink-0"
-          onMouseDown={(e) => {
-            e.preventDefault()
-            const startX = e.clientX
-            const startLeftWidth = 50
-            const container = e.currentTarget.parentElement
-            if (!container) return
-
-            const handleMove = (moveEvent: MouseEvent) => {
-              const containerWidth = container.offsetWidth
-              const diff = moveEvent.clientX - startX
-              const newLeftWidth = Math.max(30, Math.min(80, startLeftWidth + (diff / containerWidth) * 100))
-              const leftPanel = container.children[0] as HTMLElement
-              const rightPanel = container.children[2] as HTMLElement
-              if (leftPanel && rightPanel) {
-                leftPanel.style.width = `${newLeftWidth}%`
-                rightPanel.style.width = `${100 - newLeftWidth}%`
-              }
-            }
-
-            const handleUp = () => {
-              document.removeEventListener('mousemove', handleMove)
-              document.removeEventListener('mouseup', handleUp)
-              document.body.style.cursor = ''
-              document.body.style.userSelect = ''
-            }
-
-            document.addEventListener('mousemove', handleMove)
-            document.addEventListener('mouseup', handleUp)
-            document.body.style.cursor = 'col-resize'
-            document.body.style.userSelect = 'none'
-          }}
-        />
-
-        {/* Preview Panel - Mirror of Editor */}
-        <div className="w-1/2 flex flex-col">
-          <div className="flex-1 overflow-y-auto p-8">
-            <textarea
-              value={content}
-              readOnly
-              placeholder=""
-              className="w-full h-full resize-none outline-none bg-transparent text-notion-text-light dark:text-notion-text-dark font-mono text-base leading-relaxed pointer-events-none"
-              style={{ fontFamily: 'JetBrains Mono, monospace' }}
-            />
-          </div>
-
-          {/* Grammar Issues Indicator - Mirror */}
-          {grammarIssues.length > 0 && (
-            <div className="border-t border-notion-border-light dark:border-notion-border-dark p-2 bg-notion-sidebar-light dark:bg-notion-sidebar-dark flex-shrink-0">
-              <div className="text-xs text-gray-400">
+            <div className="border-t border-gray-200 dark:border-gray-700 p-2 bg-gray-50 dark:bg-gray-800 flex-shrink-0">
+              <div className="text-xs text-gray-500 dark:text-gray-400">
                 {grammarIssues.length} issue{grammarIssues.length !== 1 ? 's' : ''} found
               </div>
             </div>
@@ -187,4 +238,3 @@ export default function MarkdownEditor({
     </div>
   )
 }
-

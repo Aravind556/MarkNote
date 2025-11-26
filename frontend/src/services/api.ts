@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type { Note, GrammarIssue, GrammarCheckResponse, AICorrectionResponse } from '../types'
 
-const API_BASE_URL = '/hi'
+const API_BASE_URL = 'http://localhost:8080/hi'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
