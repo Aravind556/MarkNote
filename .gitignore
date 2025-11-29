@@ -3,6 +3,10 @@ target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+!**/src/BACKEND_ENDPOINTS_NEEDED.md
+!**/src/FRONTEND_ENDPOINTS_NEEDED.md
+!**/frontend/FRONTEND_STATUS.md
+
 
 ### STS ###
 .apt_generated

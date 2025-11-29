@@ -1,32 +1,66 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useState, useRef, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText, Plus, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { noteApi } from '../../services/api'
 import { useNoteStore } from '../../store/noteStore'
-import { format } from 'date-fns'
+import toast from 'react-hot-toast'
 
 export default function Sidebar() {
   const [searchQuery, setSearchQuery] = useState('')
   const navigate = useNavigate()
-  const { notes, setNotes, setSelectedNote } = useNoteStore()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const queryClient = useQueryClient()
+  const { notes, setNotes, setSelectedNote, addNote } = useNoteStore()
 
-  const { isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['notes'],
     queryFn: noteApi.getAllNotes,
-    onSuccess: (data) => {
-      setNotes(data)
-    },
   })
 
+  // Update notes in store when data changes
+  useEffect(() => {
+    if (data) {
+      setNotes(data)
+    }
+  }, [data, setNotes])
+
   const filteredNotes = notes.filter((note) =>
-    note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    note.content.toLowerCase().includes(searchQuery.toLowerCase())
+    note.title?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const handleNewNote = () => {
-    navigate('/')
-    setSelectedNote(null)
+    // Trigger file input click
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Check if file is .md
+    if (!file.name.endsWith('.md')) {
+      toast.error('Please select a .md (Markdown) file')
+      return
+    }
+
+    try {
+      toast.loading('Uploading note...', { id: 'upload' })
+      const newNote = await noteApi.uploadNote(file)
+      addNote(newNote)
+      // Refresh notes list
+      queryClient.invalidateQueries({ queryKey: ['notes'] })
+      toast.success('Note uploaded successfully!', { id: 'upload' })
+      // Navigate to the new note
+      navigate(`/notes/${newNote.id}`)
+      setSelectedNote(newNote)
+    } catch (error) {
+      toast.error('Failed to upload note', { id: 'upload' })
+      console.error('Upload error:', error)
+    }
+
+    // Reset file input
+    e.target.value = ''
   }
 
   const handleNoteClick = (noteId: number) => {
@@ -37,6 +71,15 @@ export default function Sidebar() {
 
   return (
     <aside className="h-full w-full bg-notion-sidebar-light dark:bg-notion-sidebar-dark flex flex-col">
+      {/* Hidden file input for .md files */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept=".md"
+        className="hidden"
+      />
+
       {/* New Note Button */}
       <div className="p-3 border-b border-notion-border-light dark:border-notion-border-dark">
         <button
@@ -84,9 +127,6 @@ export default function Sidebar() {
                     <div className="font-medium text-sm truncate text-notion-text-light dark:text-notion-text-dark">
                       {note.title || 'Untitled'}
                     </div>
-                    <div className="text-xs text-gray-400 mt-1">
-                      {format(new Date(note.createdAt), 'MMM d, yyyy')}
-                    </div>
                   </div>
                 </div>
               </button>
@@ -97,4 +137,3 @@ export default function Sidebar() {
     </aside>
   )
 }
-

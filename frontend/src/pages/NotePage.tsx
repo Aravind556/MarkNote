@@ -1,21 +1,36 @@
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { noteApi } from '../services/api'
 import MarkdownEditor from '../components/editor/MarkdownEditor'
 import { useNoteStore } from '../store/noteStore'
 
 export default function NotePage() {
   const { id } = useParams<{ id: string }>()
-  const { selectedNote, setSelectedNote } = useNoteStore()
+  const { setSelectedNote } = useNoteStore()
+  const [editorContent, setEditorContent] = useState('')
 
-  // Fetch note from the list since backend doesn't have direct getById endpoint
+  // Fetch note metadata from the list
   const { data: notes } = useQuery({
     queryKey: ['notes'],
     queryFn: noteApi.getAllNotes,
   })
 
+  // Fetch raw markdown content for the editor
+  const { data: rawContent, isLoading: isLoadingRaw } = useQuery({
+    queryKey: ['noteRaw', id],
+    queryFn: () => noteApi.getNoteRawContent(Number(id)),
+    enabled: !!id,
+  })
+
   const note = notes?.find((n) => n.id === Number(id))
+
+  // Set editor content when raw markdown is loaded
+  useEffect(() => {
+    if (rawContent) {
+      setEditorContent(rawContent)
+    }
+  }, [rawContent])
 
   useEffect(() => {
     if (note) {
@@ -23,7 +38,7 @@ export default function NotePage() {
     }
   }, [note, setSelectedNote])
 
-  const isLoading = !notes
+  const isLoading = !notes || isLoadingRaw
 
   if (isLoading) {
     return (
@@ -47,18 +62,16 @@ export default function NotePage() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-1 overflow-hidden">
-        <MarkdownEditor
-          content={note.content}
-          onChange={(newContent) => {
-            if (note) {
-              setSelectedNote({ ...note, content: newContent })
-            }
-          }}
-          noteId={note.id}
-        />
+      <div className="flex-1 flex overflow-hidden">
+        {/* Editor Panel - Full Width */}
+        <div className="w-full flex flex-col">
+          <MarkdownEditor
+            content={editorContent}
+            onChange={setEditorContent}
+            noteId={note.id}
+          />
+        </div>
       </div>
     </div>
   )
 }
-

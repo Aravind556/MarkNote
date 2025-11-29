@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Note, GrammarIssue, GrammarCheckResponse, AICorrectionResponse } from '../types'
+import type { Note, NoteListItem, GrammarIssue, GrammarCheckResponse, AICorrectionResponse } from '../types'
 
 const API_BASE_URL = 'http://localhost:8080/hi'
 
@@ -11,15 +11,15 @@ const api = axios.create({
 })
 
 export const noteApi = {
-  // Get all notes
-  getAllNotes: async (): Promise<Note[]> => {
-    const response = await api.get<Note[]>('/all')
+  // Get all notes (returns only id and title)
+  getAllNotes: async (): Promise<NoteListItem[]> => {
+    const response = await api.get<NoteListItem[]>('/all')
     return response.data
   },
 
   // Get note by ID - Backend returns HTML, so we'll get it from the list instead
   // For now, we'll need to fetch from the list or add a new endpoint
-  getNoteById: async (id: number): Promise<Note> => {
+  getNoteById: async (id: number): Promise<NoteListItem> => {
     // Since backend only returns HTML, we'll fetch from the list
     // TODO: Backend should add GET /hi/notes/{id} endpoint that returns Note JSON
     const notes = await noteApi.getAllNotes()
@@ -30,8 +30,30 @@ export const noteApi = {
     return note
   },
 
+  // Get note HTML content by ID
+  getNoteHtml: async (id: number): Promise<string> => {
+    const response = await api.get<string>(`/${id}`, {
+      headers: {
+        'Accept': 'text/html',
+      },
+      responseType: 'text',
+    })
+    return response.data
+  },
+
+  // Get raw markdown content by ID
+  getNoteRawContent: async (id: number): Promise<string> => {
+    const response = await api.get<string>(`/${id}/raw`, {
+      headers: {
+        'Accept': 'text/plain',
+      },
+      responseType: 'text',
+    })
+    return response.data
+  },
+
   // Upload/save note
-  uploadNote: async (file: File): Promise<Note> => {
+  uploadNote: async (file: File): Promise<NoteListItem> => {
     const formData = new FormData()
     formData.append('file', file)
     const response = await api.post<Note>('/file', formData, {
@@ -39,7 +61,8 @@ export const noteApi = {
         'Content-Type': 'multipart/form-data',
       },
     })
-    return response.data
+    // Return only id and title to match NoteListItem
+    return { id: response.data.id, title: response.data.title }
   },
 
   // Live grammar check

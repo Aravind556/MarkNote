@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import static java.util.stream.Collectors.toList;
 
 import org.apache.commons.text.StringEscapeUtils;
 import org.languagetool.JLanguageTool;
@@ -130,10 +131,26 @@ public class NoteService{
             throw new IllegalArgumentException("Note not found with id: " + id);
         }
     }
-    //returning all notes
-    public List<Note> getAllNotes(){
-        return repository.findAll();
+
+    //Getting raw markdown content by id
+    public String getNoteContentById(long id){
+        Note resp = repository.findById(id).orElse(null);
+        if(resp!=null){
+            String content = resp.getContent();
+            return content != null ? content : "";
+        }
+        else{
+            throw new IllegalArgumentException("Note not found with id: " + id);
+        }
     }
+    //returning all notes
+    public List<NoteDto> getAllNotes(){
+        return repository.findAll().stream()
+            .map(note -> new NoteDto(note.getId(),note.getTitle()))
+            .toList();
+    }
+    //Note dto to show only id and title in the ui 
+    public record NoteDto(long id, String title) {}
     
     //Grammar Service 
 

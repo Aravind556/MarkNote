@@ -14,7 +14,10 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.example.MarkdownNoteTaker.NoteService.Issue;
+
 import org.springframework.web.bind.annotation.RequestBody;
+
+import com.example.MarkdownNoteTaker.NoteService.NoteDto;
 
 
 
@@ -66,10 +69,28 @@ public class NoteController {
             return ResponseEntity.status(500).body("Internal server error");
         }
     }
+
+    @GetMapping("/{id}/raw")
+    public ResponseEntity<String> GetRawContentById(@PathVariable Long id){
+        try{
+            logger.info("Retrieving raw markdown for note with id: {}", id);
+            return ResponseEntity
+                .ok()
+                .contentType(MediaType.TEXT_PLAIN)
+                .body(service.getNoteContentById(id));
+        }
+        catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+        catch (Exception e){
+            logger.error("Error retrieving raw content", e);
+            return ResponseEntity.status(500).body("Internal server error");
+        }
+    }
     @GetMapping("/all")
-    public ResponseEntity<List<Note>> getAllNotes() {
+    public ResponseEntity<List<NoteDto>> getAllNotes() {
         try {
-            List<Note> notes = service.getAllNotes();
+            List<NoteDto> notes = service.getAllNotes();
             return ResponseEntity.ok(notes);
             
         } catch (Exception e) {

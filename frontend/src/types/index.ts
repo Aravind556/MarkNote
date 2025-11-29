@@ -6,6 +6,12 @@ export interface Note {
   createdAt: string
 }
 
+// NoteDto from /hi/all endpoint (only id and title)
+export interface NoteListItem {
+  id: number
+  title: string
+}
+
 export interface GrammarIssue {
   line: number
   offset?: number
